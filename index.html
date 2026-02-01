@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Nuestros Días ❤️ - G & A</title>
+
+  <!-- Firebase SDK compat - actualizado a versión más reciente con compat (2026) -->
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      min-height: 100vh;
+      background: linear-gradient(135deg, #0f001a, #1a0026, #2e0033);
+      color: #ffe6f2;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      overflow: hidden;
+    }
+    .container { padding: 30px; max-width: 95%; }
+    .time-display { display: flex; flex-wrap: wrap; justify-content: center; gap: 20px 40px; margin: 20px 0; }
+    .unit { min-width: 140px; }
+    .number { font-size: clamp(3.5rem, 12vw, 9rem); font-weight: 900; color: #ff3366; text-shadow: 0 0 20px #ff3366, 0 0 40px #ff1a4d; line-height: 1; animation: glow 4s infinite alternate; }
+    .label { font-size: clamp(1.1rem, 4vw, 1.6rem); color: #ffd1e8; margin-top: 5px; opacity: 0.9; }
+    .start-text { font-size: clamp(1.3rem, 4.5vw, 1.8rem); color: #cc99b3; margin: 20px 0; }
+    .footer { position: fixed; bottom: 15px; font-size: 1rem; color: #aa88aa; opacity: 0.8; }
+    .profiles-container { display: flex; align-items: center; justify-content: center; gap: 30px; margin: 25px 0; flex-wrap: nowrap; flex-shrink: 1; }
+    .profile { text-align: center; flex: 0 0 auto; }
+    .profile-img { width: clamp(110px, 28vw, 140px); height: clamp(110px, 28vw, 140px); border-radius: 50%; object-fit: cover; border: 4px solid #ff4da6; box-shadow: 0 0 20px rgba(255, 77, 166, 0.6); }
+    .heart-middle { font-size: clamp(3.5rem, 10vw, 6rem); color: #ff3366; text-shadow: 0 0 25px #ff1a4d; animation: beat 1.6s infinite; line-height: 1; flex: 0 0 auto; }
+    .profile-name { margin-top: 10px; font-size: clamp(1.2rem, 4.5vw, 1.8rem); color: #ff99cc; text-shadow: 0 0 10px #ff4da6; }
+
+    .edit-btn {
+      position: absolute;
+      top: 15px;
+      left: 15px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 1.9rem;
+      color: #ff99cc;
+      opacity: 0.15;
+      transition: all 0.4s ease;
+      z-index: 10;
+    }
+    body:hover .edit-btn,
+    .edit-btn:hover {
+      opacity: 0.7;
+      transform: scale(1.15);
+    }
+
+    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); justify-content: center; align-items: center; z-index: 100; }
+    .modal-content { background: #1a0026; padding: 30px; border-radius: 15px; width: 90%; max-width: 400px; text-align: left; border: 2px solid #ff4da6; }
+    .modal h2 { color: #ff99cc; margin-bottom: 20px; }
+    .modal input, .modal input[type="file"] { width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px; border: none; font-size: 1rem; }
+    .modal button { background: #ff4da6; color: white; border: none; padding: 12px 20px; border-radius: 8px; cursor: pointer; margin: 10px 5px 0 0; font-size: 1.1rem; }
+    .modal button:hover { background: #ff3366; }
+    .modal button.cancel { background: #555; }
+    .modal button.cancel:hover { background: #444; }
+    .modal button.google { background: #4285F4; width: 100%; margin: 15px 0; }
+    .modal button.google:hover { background: #357ae8; }
+    #profileSelectorModal .modal-content { text-align: center; }
+    #profileSelectorModal .choice-btn {
+      background: #ff4da6; color: white; border: none; padding: 14px 28px; margin: 12px;
+      border-radius: 12px; font-size: 1.2rem; cursor: pointer; min-width: 180px;
+    }
+    #profileSelectorModal .choice-btn:hover { background: #ff3366; transform: scale(1.05); }
+    .preview-img { max-width: 100%; max-height: 200px; margin: 10px auto; display: block; border-radius: 8px; border: 2px solid #ff4da6; }
+    #authStatus { margin: 15px 0; color: #ff99cc; font-size: 1.1rem; text-align: center; }
+
+    .toast {
+      position: fixed;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(255, 51, 102, 0.92);
+      color: white;
+      padding: 14px 28px;
+      border-radius: 12px;
+      font-size: 1.1rem;
+      box-shadow: 0 8px 25px rgba(0,0,0,0.5);
+      z-index: 200;
+      opacity: 0;
+      transition: all 0.4s ease;
+      pointer-events: none;
+      max-width: 90%;
+    }
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(-15px);
+    }
+
+    @keyframes glow { from { text-shadow: 0 0 15px #ff3366; } to { text-shadow: 0 0 45px #ff1a4d, 0 0 90px #cc0033; } }
+    @keyframes beat { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.15); } }
+    @media (max-width: 500px) { 
+      .profiles-container { gap: 20px; } 
+      .profile-img { width: clamp(90px, 25vw, 120px); height: clamp(90px, 25vw, 120px); } 
+      .heart-middle { font-size: clamp(3rem, 9vw, 4.5rem); } 
+    }
+  </style>
+</head>
+<body>
+
+  <button class="edit-btn" onclick="openProfileSelector()">✏️</button>
+
+  <div class="container">
+    <div class="profiles-container">
+      <div class="profile">
+        <img class="profile-img" id="fotoG" src="https://via.placeholder.com/140?text=Foto+G" alt="Foto de Gonzalo" crossorigin="anonymous">
+        <div class="profile-name" id="nombreG">Gonzalo</div>
+      </div>
+
+      <div class="heart-middle">💗</div>
+
+      <div class="profile">
+        <img class="profile-img" id="fotoA" src="https://via.placeholder.com/140?text=Foto+A" alt="Foto de Agostina" crossorigin="anonymous">
+        <div class="profile-name" id="nombreA">Agostina</div>
+      </div>
+    </div>
+
+    <div class="time-display">
+      <div class="unit"><div class="number" id="days">0</div><div class="label">días</div></div>
+      <div class="unit"><div class="number" id="hours">00</div><div class="label">horas</div></div>
+      <div class="unit"><div class="number" id="minutes">00</div><div class="label">minutos</div></div>
+      <div class="unit"><div class="number" id="seconds">00</div><div class="label">segundos</div></div>
+    </div>
+
+    <div class="start-text">desde el 21 de diciembre de 2025 a las 00:57</div>
+
+    <div class="next-anniversary" style="margin: 40px 0 20px; font-size: clamp(1.3rem, 4.5vw, 1.8rem); color: #ff99cc;">
+      <div id="anniversaryText">Calculando próximo mesiversario...</div>
+      <div id="anniversaryDays" class="number" style="font-size: clamp(3rem, 9vw, 6rem); color: #ff6699; margin: 10px 0;"></div>
+      <div style="font-size: 1.2rem; opacity: 0.9;">días para nuestro próximo mesiversario ❤️</div>
+    </div>
+  </div>
+
+  <div class="footer">Por siempre contando contigo 🫶</div>
+
+  <div id="toast" class="toast"><span id="toastMessage"></span></div>
+
+  <!-- Modal selector de perfil -->
+  <div id="profileSelectorModal" class="modal">
+    <div class="modal-content">
+      <h2 style="text-align:center;">¿Qué perfil querés editar?</h2>
+      <button class="choice-btn" onclick="selectProfile('gonzalo')">Gonzalo</button>
+      <button class="choice-btn" onclick="selectProfile('agostina')">Agostina</button>
+      <button onclick="closeProfileSelector()" class="cancel" style="margin-top:20px;">Cancelar</button>
+    </div>
+  </div>
+
+  <!-- Modal de edición -->
+  <div id="editModal" class="modal">
+    <div class="modal-content">
+      <h2 id="modalTitle">Editar Perfil</h2>
+      
+      <div id="authStatus">Cargando estado de sesión...</div>
+      
+      <button id="googleLoginBtn" class="google" onclick="loginWithGoogle()">Iniciar sesión con Google</button>
+      <button id="logoutBtn" style="display:none; background:#666;" onclick="logout()">Cerrar sesión</button>
+
+      <input type="text" id="editNombre" placeholder="Nuevo nombre">
+      
+      <label for="editFotoFile" style="display:block; margin:15px 0 5px; color:#ff99cc;">Subir foto desde tu dispositivo:</label>
+      <input type="file" id="editFotoFile" accept="image/*">
+      <img id="fotoPreview" class="preview-img" style="display:none;" alt="Vista previa">
+      
+      <input type="text" id="editFotoUrl" style="display: none;">
+      
+      <button onclick="guardarCambios()" style="margin-top:20px;">Guardar Cambios</button>
+      <button onclick="closeModal()" class="cancel">Cancelar</button>
+    </div>
+  </div>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyCPX9Nc2tQ1Ev0F9W-X8sxnj8Lab7PsRS8",
+      authDomain: "nuestros-dias-ga.firebaseapp.com",
+      projectId: "nuestros-dias-ga",
+      storageBucket: "nuestros-dias-ga.firebasestorage.app",
+      messagingSenderId: "131537432931",
+      appId: "1:131537432931:web:bde07608bacb8f72376356"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+    const auth = firebase.auth();
+
+    const IMGBB_API_KEY = "bbd9df4b261809ab02508a5f0c86d93c";
+
+    let perfilActual = null;
+    let currentUser = null;
+
+    // Observador de auth
+    auth.onAuthStateChanged((user) => {
+      currentUser = user;
+      const status = document.getElementById('authStatus');
+      const loginBtn = document.getElementById('googleLoginBtn');
+      const logoutBtn = document.getElementById('logoutBtn');
+
+      if (user) {
+        status.innerHTML = `Logueado como: ${user.displayName || user.email}`;
+        loginBtn.style.display = 'none';
+        logoutBtn.style.display = 'inline-block';
+      } else {
+        status.innerHTML = 'No estás logueado. Inicia sesión para editar.';
+        loginBtn.style.display = 'block';
+        logoutBtn.style.display = 'none';
+      }
+    });
+
+    window.addEventListener('load', () => {
+      cargarPerfil("gonzalo");
+      cargarPerfil("agostina");
+      updateNextAnniversary();
+    });
+
+    function cargarPerfil(id) {
+      db.collection("perfiles").doc(id).get()
+        .then((doc) => {
+          const prefix = id === "gonzalo" ? "G" : "A";
+          if (doc.exists) {
+            const data = doc.data();
+            if (data.nombre) document.getElementById("nombre" + prefix).textContent = data.nombre;
+            if (data.fotoUrl) document.getElementById("foto" + prefix).src = data.fotoUrl;
+          }
+        })
+        .catch((error) => console.error(`Error cargando ${id}:`, error));
+    }
+
+    const startDate = new Date('2025-12-21T00:57:00-03:00');
+    function updateCounter() {
+      const now = new Date();
+      let diffMs = now - startDate;
+      if (diffMs < 0) diffMs = 0;
+      document.getElementById('days').textContent = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+      document.getElementById('hours').textContent = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)).toString().padStart(2, '0');
+      document.getElementById('minutes').textContent = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60)).toString().padStart(2, '0');
+      document.getElementById('seconds').textContent = Math.floor((diffMs % (1000 * 60)) / 1000).toString().padStart(2, '0');
+    }
+    updateCounter();
+    setInterval(updateCounter, 1000);
+
+    function updateNextAnniversary() {
+      const now = new Date();
+      const annivDay = 21;
+      const annivHour = 0;
+      const annivMin = 57;
+
+      let nextAnniv = new Date(now.getFullYear(), now.getMonth(), annivDay, annivHour, annivMin, 0, 0);
+
+      // Si ya pasó este mes
+      if (nextAnniv < now) {
+        nextAnniv.setMonth(nextAnniv.getMonth() + 1);
+      }
+
+      let diffMs = nextAnniv - now;
+      let daysLeft = Math.floor(diffMs / (1000 * 60 * 60 * 24)) + (diffMs % (1000 * 60 * 60 * 24) > 0 ? 1 : 0);
+
+      if (daysLeft < 0) daysLeft = 0;
+
+      document.getElementById('anniversaryDays').textContent = daysLeft;
+
+      if (daysLeft === 0) {
+        document.getElementById('anniversaryText').textContent = '¡Hoy es nuestro mesiversario! 🥂❤️';
+        document.getElementById('anniversaryDays').style.color = '#ff3366';
+      } else if (daysLeft === 1) {
+        document.getElementById('anniversaryText').textContent = '¡Mañana es nuestro mesiversario! 💕';
+        document.getElementById('anniversaryDays').style.color = '#ff6699';
+      } else {
+        document.getElementById('anniversaryText').textContent = 'Calculando próximo mesiversario...';
+        document.getElementById('anniversaryDays').style.color = '#ff6699';
+      }
+    }
+    updateNextAnniversary();
+    setInterval(updateNextAnniversary, 60000); // cada minuto para más precisión en bordes
+
+    // resto del script sin cambios...
+
+    function openProfileSelector() {
+      document.getElementById('profileSelectorModal').style.display = 'flex';
+    }
+
+    function closeProfileSelector() {
+      document.getElementById('profileSelectorModal').style.display = 'none';
+    }
+
+    function selectProfile(quien) {
+      quien = quien.toLowerCase().trim();
+      if (quien !== "gonzalo" && quien !== "agostina") return;
+      perfilActual = quien;
+      document.getElementById('modalTitle').textContent = `Editar Perfil de ${quien.charAt(0).toUpperCase() + quien.slice(1)}`;
+      closeProfileSelector();
+      document.getElementById('editModal').style.display = 'flex';
+      
+      document.getElementById('editFotoFile').value = '';
+      document.getElementById('fotoPreview').style.display = 'none';
+      document.getElementById('editFotoUrl').value = '';
+    }
+
+    // ... (el resto del script sigue exactamente igual: event listener de file, loginWithGoogle, logout, closeModal, showToast, guardarCambios)
+  </script>
+</body>
+</html>
