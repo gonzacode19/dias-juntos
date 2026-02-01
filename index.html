@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Nuestros Días ❤️ - G & A</title>
 
-  <!-- Firebase SDK compat - actualizado a versión más reciente con compat (2026) -->
+  <!-- Firebase SDK compat -->
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
@@ -113,14 +113,14 @@
   <div class="container">
     <div class="profiles-container">
       <div class="profile">
-        <img class="profile-img" id="fotoG" src="https://via.placeholder.com/140?text=Foto+G" alt="Foto de Gonzalo" crossorigin="anonymous">
+        <img class="profile-img" id="fotoG" src="https://via.placeholder.com/140?text=Foto+G" alt="Foto de Gonzalo">
         <div class="profile-name" id="nombreG">Gonzalo</div>
       </div>
 
       <div class="heart-middle">💗</div>
 
       <div class="profile">
-        <img class="profile-img" id="fotoA" src="https://via.placeholder.com/140?text=Foto+A" alt="Foto de Agostina" crossorigin="anonymous">
+        <img class="profile-img" id="fotoA" src="https://via.placeholder.com/140?text=Foto+A" alt="Foto de Agostina">
         <div class="profile-name" id="nombreA">Agostina</div>
       </div>
     </div>
@@ -249,22 +249,12 @@
 
     function updateNextAnniversary() {
       const now = new Date();
-      const annivDay = 21;
-      const annivHour = 0;
-      const annivMin = 57;
-
-      let nextAnniv = new Date(now.getFullYear(), now.getMonth(), annivDay, annivHour, annivMin, 0, 0);
-
-      // Si ya pasó este mes
-      if (nextAnniv < now) {
-        nextAnniv.setMonth(nextAnniv.getMonth() + 1);
-      }
-
-      let diffMs = nextAnniv - now;
-      let daysLeft = Math.floor(diffMs / (1000 * 60 * 60 * 24)) + (diffMs % (1000 * 60 * 60 * 24) > 0 ? 1 : 0);
-
+      const anniversaryDay = 21;
+      let nextAnniv = new Date(now.getFullYear(), now.getMonth(), anniversaryDay, 0, 57, 0, 0);
+      if (nextAnniv < now) nextAnniv.setMonth(nextAnniv.getMonth() + 1);
+      const diffMs = nextAnniv - now;
+      let daysLeft = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
       if (daysLeft < 0) daysLeft = 0;
-
       document.getElementById('anniversaryDays').textContent = daysLeft;
 
       if (daysLeft === 0) {
@@ -274,14 +264,12 @@
         document.getElementById('anniversaryText').textContent = '¡Mañana es nuestro mesiversario! 💕';
         document.getElementById('anniversaryDays').style.color = '#ff6699';
       } else {
-        document.getElementById('anniversaryText').textContent = 'Calculando próximo mesiversario...';
+        document.getElementById('anniversaryText').textContent = '';
         document.getElementById('anniversaryDays').style.color = '#ff6699';
       }
     }
     updateNextAnniversary();
-    setInterval(updateNextAnniversary, 60000); // cada minuto para más precisión en bordes
-
-    // resto del script sin cambios...
+    setInterval(updateNextAnniversary, 3600000);
 
     function openProfileSelector() {
       document.getElementById('profileSelectorModal').style.display = 'flex';
@@ -304,7 +292,114 @@
       document.getElementById('editFotoUrl').value = '';
     }
 
-    // ... (el resto del script sigue exactamente igual: event listener de file, loginWithGoogle, logout, closeModal, showToast, guardarCambios)
+    document.getElementById('editFotoFile').addEventListener('change', async function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const readerPreview = new FileReader();
+      readerPreview.onload = function(event) {
+        document.getElementById('fotoPreview').src = event.target.result;
+        document.getElementById('fotoPreview').style.display = 'block';
+      };
+      readerPreview.readAsDataURL(file);
+
+      try {
+        const base64 = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.readAsDataURL(file);
+          reader.onload = () => resolve(reader.result.split(',')[1]);
+          reader.onerror = reject;
+        });
+
+        const formData = new FormData();
+        formData.append('image', base64);
+
+        const response = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
+          method: 'POST',
+          body: formData
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          document.getElementById('editFotoUrl').value = data.data.url;
+          showToast("Foto subida ❤️ Link listo", 3500);
+        } else {
+          showToast("Error al subir foto 😕", 4000);
+        }
+      } catch (err) {
+        showToast("Problema al subir la foto", 4000);
+        console.error(err);
+      }
+    });
+
+    function loginWithGoogle() {
+      const provider = new firebase.auth.GoogleAuthProvider();
+      auth.signInWithPopup(provider)
+        .catch((error) => {
+          showToast("Error al iniciar sesión: " + error.message, 5000);
+          console.error(error);
+        });
+    }
+
+    function logout() {
+      auth.signOut()
+        .then(() => showToast("Sesión cerrada", 3000))
+        .catch((error) => showToast("Error al cerrar sesión", 3000));
+    }
+
+    function closeModal() {
+      document.getElementById('editModal').style.display = 'none';
+      document.getElementById('editNombre').value = '';
+      document.getElementById('editFotoUrl').value = '';
+      document.getElementById('editFotoFile').value = '';
+      document.getElementById('fotoPreview').style.display = 'none';
+    }
+
+    function showToast(message, duration = 3000) {
+      const toast = document.getElementById('toast');
+      document.getElementById('toastMessage').textContent = message;
+      toast.classList.add('show');
+      toast.style.display = 'block';
+      setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.style.display = 'none', 500);
+      }, duration);
+    }
+
+    function guardarCambios() {
+      if (!currentUser) {
+        showToast("Inicia sesión con Google primero ❤️", 4000);
+        return;
+      }
+
+      const nombre = document.getElementById('editNombre').value.trim();
+      const fotoUrl = document.getElementById('editFotoUrl').value.trim();
+
+      if (!fotoUrl && !nombre) {
+        showToast("Cambia algo antes de guardar", 3000);
+        return;
+      }
+
+      const updateData = { updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
+      if (nombre) updateData.nombre = nombre;
+      if (fotoUrl) updateData.fotoUrl = fotoUrl;
+
+      db.collection("perfiles").doc(perfilActual).set(updateData, { merge: true })
+        .then(() => {
+          const prefix = perfilActual === "gonzalo" ? "G" : "A";
+          if (nombre) document.getElementById("nombre" + prefix).textContent = nombre;
+          if (fotoUrl) document.getElementById("foto" + prefix).src = fotoUrl;
+          
+          showToast("Perfil actualizado 🫶", 3500);
+          setTimeout(() => location.reload(), 1800);
+          closeModal();
+        })
+        .catch((error) => {
+          showToast("Error al guardar 😔", 5000);
+          console.error(error);
+        });
+    }
   </script>
 </body>
 </html>
