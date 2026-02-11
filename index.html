@@ -373,6 +373,19 @@
         return;
       }
 
+      // Lista de UIDs permitidos (cambiá estos por los reales de vos y Agostina)
+      const allowedUids = [
+        "Lmi2TpKixJP9ez36TLXjWnZp9V22",           // ← Reemplazá con tu UID (Gonzalo)
+        "PON_UID_DE_AGOSTINA_AQUI"   // ← Reemplazá con el UID de Agostina
+      ];
+
+      // Chequeo rápido antes de intentar guardar
+      if (!allowedUids.includes(currentUser.uid)) {
+        showToast("Solo Gonzalo y Agostina pueden editar 😊", 5000);
+        closeModal();
+        return;
+      }
+
       const nombre = document.getElementById('editNombre').value.trim();
       const fotoUrl = document.getElementById('editFotoUrl').value.trim();
 
@@ -402,4 +415,4 @@
     }
   </script>
 </body>
-</html>
+  </html>
